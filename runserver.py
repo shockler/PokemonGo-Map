@@ -98,11 +98,6 @@ def main():
 
     args = get_args()
 
-    # Check for depreciated argumented
-    if args.debug:
-        log.warning('--debug is depreciated. Please use --verbose instead.  Enabling --verbose')
-        args.verbose = 'nofile'
-
     # Add file logging if enabled
     if args.verbose and args.verbose != 'nofile':
         filelog = logging.FileHandler(args.verbose)
@@ -184,6 +179,8 @@ def main():
         log.info('Parsing of Pokestops disabled')
     if args.no_gyms:
         log.info('Parsing of Gyms disabled')
+    if args.encounter:
+        log.info('Encountering pokemon enabled')
 
     config['LOCALE'] = args.locale
     config['CHINA'] = args.china
