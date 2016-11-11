@@ -457,7 +457,7 @@ def search_worker_thread(args, account_queue, account_failures, search_items_que
                             else:
                                 status['message'] = 'Retrieved captcha token, attempting to verify challenge for {}'.format(account['username'])
                                 log.info(status['message'])
-                                response = api.verify_challenge(token = captcha_token)
+                                response = api.verify_challenge(token=captcha_token)
 
                                 if 'success' in response['responses']['VERIFY_CHALLENGE']:
                                     status['message'] = "Account {} successfully uncaptcha'd".format(account['username'])
@@ -695,7 +695,6 @@ def gym_request(api, position, gym):
 
 
 def captcha_request(api):
-    captcha = {}
     response = api.check_challenge()
     captcha_url = response['responses']['CHECK_CHALLENGE']['challenge_url']
     return captcha_url
@@ -708,7 +707,7 @@ def token_request(args, status, url):
         captcha_id = s.post("http://2captcha.com/in.php?key={}&method=userrecaptcha&googlekey={}&pageurl={}".format(args.captcha_key, args.captcha_dsk, url)).text.split('|')[1]
         captcha_id = str(captcha_id)
     # IndexError implies that the retuned response was a 2captcha error
-    except IndexError: 
+    except IndexError:
         return 'ERROR'
     status['message'] = 'Retrieved captcha ID: {}; now retrieving token'.format(captcha_id)
     log.info(status['message'])
