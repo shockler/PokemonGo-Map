@@ -774,6 +774,7 @@ def check_speed_limit(args, previous_location, next_location, last_scan_time):
 
     return 0
 
+
 # Delay each thread start time so that logins only occur ~1s
 def stagger_thread(args, account):
     if args.accounts.index(account) == 0:
