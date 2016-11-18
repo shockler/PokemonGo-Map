@@ -537,6 +537,36 @@ def search_worker_thread(args, account_queue, account_failures, search_items_que
                     log.error(status['message'])
                     time.sleep(args.scan_delay)
                     continue
+                    
+                # Captcha check
+                if args.captcha_solving: 
+
+                    captcha_url = response_dict['responses']['CHECK_CHALLENGE']['challenge_url']
+
+                    if captcha_url > 1:
+                        status['message'] = 'Account {} is encountering a captcha, starting 2captcha sequence'.format(account['username'])
+                        log.warning(status['message'])
+                        captcha_token = token_request(args, status, captcha_url)
+
+                        if 'ERROR' in captcha_token:
+                            log.warning("Unable to resolve captcha, please check your 2captcha API key and/or wallet balance")
+                            account_failures.append({'account': account, 'last_fail_time': now(), 'reason': 'catpcha failed to verify'})
+                            break
+
+                        else:
+                            status['message'] = 'Retrieved captcha token, attempting to verify challenge for {}'.format(account['username'])
+                            log.info(status['message'])
+                            response = api.verify_challenge(token=captcha_token)
+
+                            if 'success' in response['responses']['VERIFY_CHALLENGE']:
+                                status['message'] = "Account {} successfully uncaptcha'd".format(account['username'])
+                                log.info(status['message'])
+
+                            else:
+                                status['message'] = "Account {} failed verifyChallenge, putting away account for now".format(account['username'])
+                                log.info(status['message'])
+                                account_failures.append({'account': account, 'last_fail_time': now(), 'reason': 'catpcha failed to verify'})
+                                break
 
                 # Got the response, parse it out, send todo's to db/wh queues
                 try:
@@ -668,10 +698,15 @@ def map_request(api, position, jitter=False):
     try:
         cell_ids = util.get_cell_ids(scan_location[0], scan_location[1])
         timestamps = [0, ] * len(cell_ids)
-        return api.get_map_objects(latitude=f2i(scan_location[0]),
-                                   longitude=f2i(scan_location[1]),
-                                   since_timestamp_ms=timestamps,
-                                   cell_id=cell_ids)
+        req = api.create_request()
+        response = req.check_challenge()
+        response = req.get_map_objects(latitude=f2i(scan_location[0]),
+                                       longitude=f2i(scan_location[1]),
+                                       since_timestamp_ms=timestamps,
+                                       cell_id=cell_ids)
+        response = req.call()
+        return response
+
     except Exception as e:
         log.warning('Exception while downloading map: %s', e)
         return False
