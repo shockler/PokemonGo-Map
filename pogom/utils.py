@@ -96,7 +96,7 @@ def get_args():
                                 help='List of pokemon to NOT encounter for more stats')
     parser.add_argument('-ld', '--login-delay',
                         help='Time delay between each login attempt',
-                        type=float, default=5)
+                        type=float, default=6)
     parser.add_argument('-lr', '--login-retries',
                         help='Number of logins attempts before refreshing a thread',
                         type=int, default=3)

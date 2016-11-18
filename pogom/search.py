@@ -828,11 +828,11 @@ def calc_distance(pos1, pos2):
     return d
 
 
-# Delay each thread start time so that logins only occur ~1s
+# Delay each thread start time so that logins occur after delay
 def stagger_thread(args, account):
     if args.accounts.index(account) == 0:
         return  # No need to delay the first one
-    delay = args.accounts.index(account) * 6 + ((random.random() - .5) / 2)
+    delay = args.accounts.index(account) * args.login_delay + ((random.random() - .5) / 2)
     log.debug('Delaying thread startup for %.2f seconds', delay)
     time.sleep(delay)
 
