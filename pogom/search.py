@@ -510,7 +510,7 @@ def search_worker_thread(args, account_queue, account_failures, search_items_que
                 # Got the response, check for captcha, parse it out, send todo's to db/wh queues
                 try:
                     # Captcha check
-                    if args.captcha_solving: 
+                    if args.captcha_solving:
                         captcha_url = response_dict['responses']['CHECK_CHALLENGE']['challenge_url']
                         if len(captcha_url) > 1:
                             status['message'] = 'Account {} is encountering a captcha, starting 2captcha sequence'.format(account['username'])

@@ -180,3 +180,4 @@ def api_scan(lat, lng):
 
 if __name__ == '__main__':
     app.run(threaded=True, debug=args.debug, host=args.host, port=args.port)
+
