@@ -252,7 +252,7 @@ def worker_status_db_thread(threads_status, name, db_updates_queue):
 
 
 # The main search loop that keeps an eye on the over all process
-def search_overseer_thread(args, new_location_queue, pause_bit, heartb, encryption_lib_path, db_updates_queue, wh_queue):
+def search_overseer_thread(args, new_location_queue, pause_bit, heartb, db_updates_queue, wh_queue):
 
     log.info('Search overseer starting')
 
@@ -332,7 +332,7 @@ def search_overseer_thread(args, new_location_queue, pause_bit, heartb, encrypti
         t = Thread(target=search_worker_thread,
                    name='search-worker-{}'.format(i),
                    args=(args, account_queue, account_failures, search_items_queue, pause_bit,
-                         encryption_lib_path, threadStatus[workerId],
+                         threadStatus[workerId],
                          db_updates_queue, wh_queue))
         t.daemon = True
         t.start()
@@ -385,7 +385,7 @@ def search_overseer_thread(args, new_location_queue, pause_bit, heartb, encrypti
         time.sleep(1)
 
 
-def search_worker_thread(args, account_queue, account_failures, search_items_queue, pause_bit, encryption_lib_path, status, dbq, whq):
+def search_worker_thread(args, account_queue, account_failures, search_items_queue, pause_bit, status, dbq, whq):
 
     log.debug('Search worker thread starting')
 
@@ -427,7 +427,7 @@ def search_worker_thread(args, account_queue, account_failures, search_items_que
                 log.debug("Using proxy %s", status['proxy_url'])
                 api.set_proxy({'http': status['proxy_url'], 'https': status['proxy_url']})
 
-            api.activate_signature(encryption_lib_path)
+            # api.activate_signature(encryption_lib_path)
 
             # The forever loop for the searches
             while True:
@@ -438,6 +438,37 @@ def search_worker_thread(args, account_queue, account_failures, search_items_que
                     log.warning(status['message'])
                     account_failures.append({'account': account, 'last_fail_time': now(), 'reason': 'failures'})
                     break  # exit this loop to get a new account and have the API recreated
+
+                if args.captcha_solving:
+
+                    if consecutive_empties >= 2:
+                        captcha_url = captcha_request(api)
+
+                        if len(captcha_url) > 1:
+                            status['message'] = 'Account {} is encountering a captcha, starting 2captcha sequence'.format(account['username'])
+                            log.warning(status['message'])
+                            captcha_token = token_request(args, status, captcha_url)
+
+                            if 'ERROR' in captcha_token:
+                                log.warning("Unable to resolve captcha, please check your 2captcha API key and/or wallet balance")
+                                account_failures.append({'account': account, 'last_fail_time': now(), 'reason': 'catpcha failed to verify'})
+                                break
+
+                            else:
+                                status['message'] = 'Retrieved captcha token, attempting to verify challenge for {}'.format(account['username'])
+                                log.info(status['message'])
+                                response = api.verify_challenge(token=captcha_token)
+
+                                if 'success' in response['responses']['VERIFY_CHALLENGE']:
+                                    status['message'] = "Account {} successfully uncaptcha'd".format(account['username'])
+                                    log.info(status['message'])
+
+                                else:
+                                    status['message'] = "Account {} failed verifyChallenge, putting away account for now".format(account['username'])
+                                    log.info(status['message'])
+                                    account_failures.append({'account': account, 'last_fail_time': now(), 'reason': 'catpcha failed to verify'})
+                                    break
+                                time.sleep(1)
 
                 while pause_bit.is_set():
                     status['message'] = 'Scanning paused'
@@ -506,36 +537,6 @@ def search_worker_thread(args, account_queue, account_failures, search_items_que
                     log.error(status['message'])
                     time.sleep(args.scan_delay)
                     continue
-                    
-                # Captcha check
-                if args.captcha_solving: 
-
-                    captcha_url = response_dict['responses']['CHECK_CHALLENGE']['challenge_url']
-
-                    if captcha_url > 1:
-                        status['message'] = 'Account {} is encountering a captcha, starting 2captcha sequence'.format(account['username'])
-                        log.warning(status['message'])
-                        captcha_token = token_request(args, status, captcha_url)
-
-                        if 'ERROR' in captcha_token:
-                            log.warning("Unable to resolve captcha, please check your 2captcha API key and/or wallet balance")
-                            account_failures.append({'account': account, 'last_fail_time': now(), 'reason': 'catpcha failed to verify'})
-                            break
-
-                        else:
-                            status['message'] = 'Retrieved captcha token, attempting to verify challenge for {}'.format(account['username'])
-                            log.info(status['message'])
-                            response = api.verify_challenge(token=captcha_token)
-
-                            if 'success' in response['responses']['VERIFY_CHALLENGE']:
-                                status['message'] = "Account {} successfully uncaptcha'd".format(account['username'])
-                                log.info(status['message'])
-
-                            else:
-                                status['message'] = "Account {} failed verifyChallenge, putting away account for now".format(account['username'])
-                                log.info(status['message'])
-                                account_failures.append({'account': account, 'last_fail_time': now(), 'reason': 'catpcha failed to verify'})
-                                break
 
                 # Got the response, parse it out, send todo's to db/wh queues
                 try:
@@ -667,15 +668,10 @@ def map_request(api, position, jitter=False):
     try:
         cell_ids = util.get_cell_ids(scan_location[0], scan_location[1])
         timestamps = [0, ] * len(cell_ids)
-        req = api.create_request()
-        response = req.check_challenge()
-        response = req.get_map_objects(latitude=f2i(scan_location[0]),
-                                       longitude=f2i(scan_location[1]),
-                                       since_timestamp_ms=timestamps,
-                                       cell_id=cell_ids)
-        response = req.call()
-        return response
-
+        return api.get_map_objects(latitude=f2i(scan_location[0]),
+                                   longitude=f2i(scan_location[1]),
+                                   since_timestamp_ms=timestamps,
+                                   cell_id=cell_ids)
     except Exception as e:
         log.warning('Exception while downloading map: %s', e)
         return False
@@ -696,6 +692,12 @@ def gym_request(api, position, gym):
     except Exception as e:
         log.warning('Exception while downloading gym details: %s', e)
         return False
+
+
+def captcha_request(api):
+    response = api.check_challenge()
+    captcha_url = response['responses']['CHECK_CHALLENGE']['challenge_url']
+    return captcha_url
 
 
 def token_request(args, status, url):

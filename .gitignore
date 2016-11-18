@@ -25,3 +25,5 @@ beehive.*
 !contrib/supervisord/gen-workers.sh
 !contrib/supervisord/install-reinstall.sh
 !static/data/*
+pogom/search.py
+pogom/search.py
