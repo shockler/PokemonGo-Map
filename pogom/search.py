@@ -664,6 +664,11 @@ def map_request(api, position, jitter=False):
         timestamps = [0, ] * len(cell_ids)
         req = api.create_request()
         response = req.check_challenge()
+        response = req.get_hatched_eggs()
+        response = req.get_inventory()
+        response = req.check_awarded_badges()
+        response = req.download_settings()
+        response = req.get_buddy_walked()
         response = req.get_map_objects(latitude=f2i(scan_location[0]),
                                        longitude=f2i(scan_location[1]),
                                        since_timestamp_ms=timestamps,
