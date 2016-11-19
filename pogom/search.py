@@ -24,7 +24,6 @@ import random
 import time
 import geopy
 import geopy.distance
-import geocoder
 import requests
 
 from datetime import datetime
@@ -485,8 +484,8 @@ def search_worker_thread(args, account_queue, account_failures, search_items_que
                     continue
 
                 # Get the actual altitude of step_location
-                altitude = geocoder.elevation([step_location[0], step_location[1]])
-                step_location = (step_location[0], step_location[1], altitude.meters)
+                altitude = get_altitude(step_location[0], step_location[1])
+                step_location = (step_location[0], step_location[1], altitude)
 
                 # Let the api know where we intend to be for this loop
                 # doing this before check_login so it does not also have to be done there
@@ -497,7 +496,7 @@ def search_worker_thread(args, account_queue, account_failures, search_items_que
                 check_login(args, account, api, step_location, status['proxy_url'])
 
                 # putting this message after the check_login so the messages aren't out of order
-                status['message'] = 'Searching at {:6f},{:6f}'.format(step_location[0], step_location[1])
+                status['message'] = 'Searching at {:6f},{:6f},{:6f}'.format(step_location[0], step_location[1], step_location[2])
                 log.info(status['message'])
 
                 # Make the actual request (finally!)
@@ -739,6 +738,15 @@ def calc_distance(pos1, pos2):
 
     return d
 
+def get_altitude(latitude, longitude):
+    r = requests.Session()
+    try:
+        response = r.get("https://maps.googleapis.com/maps/api/elevation/json?locations={},{}&key={}".format(latitude, longitude, args.gmaps_key))
+        response = response.json()
+        altitude = response["results"][0]["elevation"]
+    except:
+        altitude = 0.0
+    return altitude
 
 # Delay each thread start time so that logins only occur ~1s
 def stagger_thread(args, account):
