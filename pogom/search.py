@@ -483,10 +483,6 @@ def search_worker_thread(args, account_queue, account_failures, search_items_que
                     # No sleep here; we've not done anything worth sleeping for. Plus we clearly need to catch up!
                     continue
 
-                # Get the actual altitude of step_location
-                altitude = get_altitude(step_location[0], step_location[1], args.gmaps_key)
-                step_location = (step_location[0], step_location[1], altitude)
-
                 # Let the api know where we intend to be for this loop
                 # doing this before check_login so it does not also have to be done there
                 # when the auth token is refreshed
@@ -737,17 +733,6 @@ def calc_distance(pos1, pos2):
     d = R * c
 
     return d
-
-
-def get_altitude(latitude, longitude, key):
-    r = requests.Session()
-    try:
-        response = r.get("https://maps.googleapis.com/maps/api/elevation/json?locations={},{}&key={}".format(latitude, longitude, key))
-        response = response.json()
-        altitude = response["results"][0]["elevation"]
-    except:
-        altitude = 0.0
-    return altitude
 
 
 # Delay each thread start time so that logins only occur ~1s
